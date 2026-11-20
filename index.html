@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Sistem Informasi Gejala Pertussis</title>
+
+    <style>
+        :root {
+            --navy: #17324d;
+            --blue: #246b8e;
+            --pale: #eef6f8;
+            --ink: #263746;
+            --muted: #617383;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fa;
+            color: var(--ink);
+        }
+
+        header {
+            background: linear-gradient(125deg, #17324d, #246b8e);
+            color: white;
+            padding: 38px 20px;
+        }
+
+        .wrap {
+            max-width: 1000px;
+            margin: auto;
+        }
+
+        header h1 {
+            margin: 0 0 10px;
+            font-size: clamp(26px, 4vw, 38px);
+        }
+
+        header p {
+            margin: 0;
+            line-height: 1.6;
+            color: #e4f0f6;
+            max-width: 760px;
+        }
+
+        main {
+            max-width: 1000px;
+            margin: 26px auto;
+            padding: 0 16px 36px;
+        }
+
+        .panel {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 20px #16324d12;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: var(--navy);
+        }
+
+        .hint {
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(
+                auto-fit,
+                minmax(260px, 1fr)
+            );
+            gap: 12px;
+        }
+
+        label.symptom {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            border: 1px solid #dce6ec;
+            border-radius: 12px;
+            padding: 14px;
+            cursor: pointer;
+            line-height: 1.45;
+        }
+
+        label.symptom:hover {
+            border-color: var(--blue);
+            background: #f7fbfc;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+            accent-color: var(--blue);
+            flex-shrink: 0;
+        }
+
+        .code {
+            display: inline-block;
+            font-size: 12px;
+            color: var(--blue);
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        button {
+            border: 0;
+            border-radius: 10px;
+            background: var(--blue);
+            color: white;
+            padding: 13px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 18px;
+        }
+
+        button:hover {
+            background: #194f6c;
+        }
+
+        .result {
+            border-left: 5px solid var(--blue);
+            background: var(--pale);
+            padding: 18px;
+            border-radius: 10px;
+            margin: 12px 0;
+        }
+
+        .result h3 {
+            margin: 0 0 8px;
+            color: var(--navy);
+        }
+
+        .bar-bg {
+            background: #dce7ed;
+            height: 10px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0 4px;
+        }
+
+        .bar {
+            height: 100%;
+            background: var(--blue);
+            border-radius: 10px;
+        }
+
+        .warning {
+            background: #fff8e8;
+            border: 1px solid #f0dfb1;
+            border-radius: 12px;
+            padding: 15px;
+            line-height: 1.6;
+        }
+
+        .empty {
+            color: var(--muted);
+        }
+
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 13px;
+            padding: 10px 16px 30px;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+
+        @media (max-width: 600px) {
+            .panel {
+                padding: 18px;
+            }
+
+            header {
+                padding: 30px 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <div class="wrap">
+        <h1>Sistem Informasi Gejala Pertussis</h1>
+
+        <p>
+            Pilih gejala yang dialami untuk melihat kemiripan
+            pola gejala dengan tiga kategori pertussis berdasarkan
+            metode Cosine Similarity.
+        </p>
+    </div>
+</header>
+
+<main>
+
+    <section class="panel">
+        <h2>1. Pilih gejala</h2>
+
+        <p class="hint">
+            Centang semua gejala yang sedang dialami.
+            Kamu dapat memilih lebih dari satu gejala.
+        </p>
+
+        <form id="diagnosisForm">
+
+            <div class="grid" id="symptomList"></div>
+
+            <button type="submit">Analisis Kemiripan</button>
+
+        </form>
+    </section>
+
+    <section class="panel" id="resultPanel" hidden>
+
+        <h2>2. Hasil perhitungan</h2>
+
+        <div id="resultContent"></div>
+
+    </section>
+
+    <section class="panel">
+
+        <h2>Catatan penting</h2>
+
+        <div class="warning">
+            Website ini merupakan demonstrasi pembelajaran
+            menggunakan metode Cosine Similarity.
+
+            Skor kemiripan menunjukkan kesamaan pola gejala
+            terhadap kategori yang ditentukan dalam program,
+            bukan peluang seseorang terkena penyakit dan bukan
+            diagnosis medis.
+
+            Pertussis perlu dinilai oleh tenaga kesehatan.
+            Jika mengalami kesulitan bernapas, bibir atau wajah
+            membiru, segera cari pertolongan medis.
+        </div>
+
+    </section>
+
+</main>
+
+<footer>
+    Demo pembelajaran • Sistem Informasi Gejala Pertussis
+</footer>
+
+<script>
+    // 1. Data gejala
+    const GEJALA = {
+        G1: "Hidung meler",
+        G2: "Bersin-bersin",
+        G3: "Demam serta merasa pengap",
+        G4: "Batuk keras dengan tarikan napas awal yang panjang melalui mulut",
+        G5: "Terdengar seperti mau muntah",
+        G6: "Mata merah dan berair",
+        G7: "Wajah berwarna merah atau biru",
+        G8: "Kelelahan yang ekstrem",
+        G9: "Suara tinggi melengking saat menarik napas"
+    };
+
+    // 2. Data kategori pertussis
+    const PENYAKIT = {
+        P01: {
+            nama: "Pertussis Ringan",
+            gejala: ["G1", "G2", "G3", "G4"]
+        },
+
+        P02: {
+            nama: "Pertussis Akut",
+            gejala: ["G3", "G4", "G5", "G6"]
+        },
+
+        P03: {
+            nama: "Pertussis Subakut/Kronis",
+            gejala: ["G4", "G7", "G8", "G9"]
+        }
+    };
+
+    // 3. Menampilkan pilihan gejala
+    const symptomList = document.getElementById("symptomList");
+
+    for (const code in GEJALA) {
+        const label = document.createElement("label");
+        label.className = "symptom";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.name = "gejala";
+        checkbox.value = code;
+
+        const description = document.createElement("span");
+
+        const codeElement = document.createElement("span");
+        codeElement.className = "code";
+        codeElement.textContent = code;
+
+        const lineBreak = document.createElement("br");
+
+        description.appendChild(codeElement);
+        description.appendChild(lineBreak);
+        description.appendChild(
+            document.createTextNode(GEJALA[code])
+        );
+
+        label.appendChild(checkbox);
+        label.appendChild(description);
+
+        symptomList.appendChild(label);
+    }
+
+    // 4. Menghitung Cosine Similarity
+    function cosineSimilarity(selected, diseaseSymptoms) {
+        if (selected.length === 0) {
+            return 0;
+        }
+
+        let dotProduct = 0;
+
+        for (const code of selected) {
+            if (diseaseSymptoms.includes(code)) {
+                dotProduct++;
+            }
+        }
+
+        const selectedNorm = Math.sqrt(selected.length);
+        const diseaseNorm = Math.sqrt(diseaseSymptoms.length);
+
+        if (selectedNorm === 0 || diseaseNorm === 0) {
+            return 0;
+        }
+
+        return dotProduct / (selectedNorm * diseaseNorm);
+    }
+
+    // 5. Memproses pilihan gejala
+    document.getElementById("diagnosisForm")
+        .addEventListener("submit", function(event) {
+
+            event.preventDefault();
+
+            const selected = Array.from(
+                document.querySelectorAll(
+                    'input[name="gejala"]:checked'
+                )
+            ).map(input => input.value);
+
+            const resultPanel =
+                document.getElementById("resultPanel");
+
+            const resultContent =
+                document.getElementById("resultContent");
+
+            resultPanel.hidden = false;
+            resultContent.replaceChildren();
+
+            const heading = document.createElement("p");
+            heading.className = "hint";
+
+            if (selected.length === 0) {
+                heading.className = "empty";
+                heading.textContent =
+                    "Belum ada gejala yang dipilih. " +
+                    "Silakan pilih setidaknya satu gejala, " +
+                    "lalu tekan tombol analisis.";
+
+                resultContent.appendChild(heading);
+                resultPanel.scrollIntoView({
+                    behavior: "smooth"
+                });
+                return;
+            }
+
+            heading.textContent =
+                "Gejala terpilih: " + selected.length +
+                ". Hasil berikut merupakan skor kemiripan " +
+                "pola gejala, bukan diagnosis medis.";
+
+            resultContent.appendChild(heading);
+
+            // Menghitung skor setiap kategori
+            const results = [];
+
+            for (const code in PENYAKIT) {
+                const disease = PENYAKIT[code];
+
+                const score = cosineSimilarity(
+                    selected,
+                    disease.gejala
+                );
+
+                let overlap = 0;
+
+                for (const symptom of selected) {
+                    if (disease.gejala.includes(symptom)) {
+                        overlap++;
+                    }
+                }
+
+                results.push({
+                    kode: code,
+                    nama: disease.nama,
+                    score: score,
+                    overlap: overlap,
+                    total: disease.gejala.length
+                });
+            }
+
+            // Mengurutkan skor dari terbesar
+            results.sort(function(a, b) {
+                return b.score - a.score;
+            });
+
+            // Menampilkan hasil perhitungan
+            for (const item of results) {
+                const result = document.createElement("div");
+                result.className = "result";
+
+                const title = document.createElement("h3");
+                title.textContent = item.nama;
+
+                const percentage = document.createElement("strong");
+                percentage.textContent =
+                    (item.score * 100).toFixed(1) +
+                    "% kemiripan";
+
+                const barBackground =
+                    document.createElement("div");
+
+                barBackground.className = "bar-bg";
+
+                const bar = document.createElement("div");
+                bar.className = "bar";
+
+                bar.style.width =
+                    Math.min(item.score * 100, 100) + "%";
+
+                barBackground.appendChild(bar);
+
+                const detail = document.createElement("small");
+
+                detail.textContent =
+                    "Gejala yang cocok dengan pola: " +
+                    item.overlap + " dari " +
+                    item.total + " gejala pada kategori ini.";
+
+                result.appendChild(title);
+                result.appendChild(percentage);
+                result.appendChild(barBackground);
+                result.appendChild(detail);
+
+                resultContent.appendChild(result);
+            }
+
+            const highest = document.createElement("p");
+            const bold = document.createElement("strong");
+
+            bold.textContent = "Pola yang paling mirip: ";
+
+            highest.appendChild(bold);
+            highest.appendChild(
+                document.createTextNode(results[0].nama + ".")
+            );
+
+            resultContent.appendChild(highest);
+
+            resultPanel.scrollIntoView({
+                behavior: "smooth"
+            });
+        });
+</script>
+
+</body>
+</html>
