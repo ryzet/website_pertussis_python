@@ -1,7 +1,12 @@
-from flask import Flask, request, render_template_string
+import tempfile
+from pathlib import Path
 
-app = Flask(__name__)
+import streamlit as st
+import streamlit.components.v1 as components
 
+# ---------------------------------------------------------------------------
+# Data (tidak diubah dari versi Flask)
+# ---------------------------------------------------------------------------
 GEJALA = {
     "G1": "Hidung meler",
     "G2": "Bersin-bersin",
@@ -29,6 +34,7 @@ PENYAKIT = {
     },
 }
 
+
 def cosine_similarity(selected, disease_symptoms):
     """Menghitung cosine similarity untuk vektor biner G1-G9."""
     if not selected:
@@ -43,14 +49,11 @@ def cosine_similarity(selected, disease_symptoms):
 
     return dot_product / (selected_norm * disease_norm)
 
-HTML = """
-<!doctype html>
-<html lang="id">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sistem Informasi Gejala Pertussis</title>
-  <style>
+
+# ---------------------------------------------------------------------------
+# CSS asli dari versi Flask (tidak diubah sama sekali)
+# ---------------------------------------------------------------------------
+STYLE = """
     :root { --navy:#17324d; --blue:#246b8e; --pale:#eef6f8; --ink:#263746; --muted:#617383; }
     * { box-sizing: border-box; }
     body { margin:0; font-family: Arial, sans-serif; background:#f4f7fa; color:var(--ink); }
@@ -77,9 +80,60 @@ HTML = """
     .empty { color:var(--muted); }
     footer { text-align:center; color:var(--muted); font-size:13px; padding:10px 16px 30px; }
     @media(max-width:600px) { .panel { padding:18px; } header { padding:30px 18px; } }
-  </style>
-</head>
-<body>
+"""
+
+
+def _render_results(selected, results):
+    if not selected:
+        return (
+            '<p class="empty">Belum ada gejala yang dipilih. Silakan pilih '
+            "setidaknya satu gejala, lalu tekan tombol analisis.</p>"
+        )
+
+    items = []
+    for item in results:
+        items.append(
+            f"""
+      <div class="result">
+        <h3>{item["nama"]}</h3>
+        <strong>{item["score"] * 100:.1f}% kemiripan</strong>
+        <div class="bar-bg"><div class="bar" style="width:{item["score"] * 100}%"></div></div>
+        <small>Gejala yang cocok dengan pola: {item["overlap"]} dari {item["total"]} gejala pada kategori ini.</small>
+      </div>"""
+        )
+
+    return (
+        f'<p class="hint">Gejala terpilih: {len(selected)}. Hasil berikut adalah skor '
+        "kemiripan pola gejala, bukan diagnosis medis.</p>"
+        + "".join(items)
+        + f'<p><strong>Pola yang paling mirip:</strong> {results[0]["nama"]}.</p>'
+    )
+
+
+def render_page(selected, submitted, results):
+    """Membangun HTML halaman dengan CSS & struktur yang sama seperti versi Flask."""
+    selected_set = set(selected)
+
+    symptom_cards = []
+    for code, name in GEJALA.items():
+        checked = " checked" if code in selected_set else ""
+        symptom_cards.append(
+            f"""
+        <label class="symptom">
+          <input type="checkbox" name="gejala" value="{code}"{checked}>
+          <span><span class="code">{code}</span><br>{name}</span>
+        </label>"""
+        )
+
+    result_section = ""
+    if submitted:
+        result_section = f"""
+  <section class="panel">
+    <h2>2. Hasil perhitungan</h2>
+    {_render_results(selected, results)}
+  </section>"""
+
+    return f"""<style>{STYLE}</style>
 <header>
   <div class="wrap">
     <h1>Sistem Informasi Gejala Pertussis</h1>
@@ -91,38 +145,12 @@ HTML = """
     <h2>1. Pilih gejala</h2>
     <p class="hint">Centang semua gejala yang sedang dialami. Jika tidak ada gejala yang sesuai, biarkan tidak terpilih.</p>
     <form method="post">
-      <div class="grid">
-      {% for code, name in symptoms.items() %}
-        <label class="symptom">
-          <input type="checkbox" name="gejala" value="{{ code }}" {% if code in selected %}checked{% endif %}>
-          <span><span class="code">{{ code }}</span><br>{{ name }}</span>
-        </label>
-      {% endfor %}
+      <div class="grid">{"".join(symptom_cards)}
       </div>
       <button type="submit">Analisis Kemiripan</button>
     </form>
   </section>
-
-  {% if submitted %}
-  <section class="panel">
-    <h2>2. Hasil perhitungan</h2>
-    {% if not selected %}
-      <p class="empty">Belum ada gejala yang dipilih. Silakan pilih setidaknya satu gejala, lalu tekan tombol analisis.</p>
-    {% else %}
-      <p class="hint">Gejala terpilih: {{ selected|length }}. Hasil berikut adalah skor kemiripan pola gejala, bukan diagnosis medis.</p>
-      {% for item in results %}
-      <div class="result">
-        <h3>{{ item.nama }}</h3>
-        <strong>{{ "%.1f"|format(item.score * 100) }}% kemiripan</strong>
-        <div class="bar-bg"><div class="bar" style="width:{{ item.score * 100 }}%"></div></div>
-        <small>Gejala yang cocok dengan pola: {{ item.overlap }} dari {{ item.total }} gejala pada kategori ini.</small>
-      </div>
-      {% endfor %}
-      <p><strong>Pola yang paling mirip:</strong> {{ results[0].nama }}.</p>
-    {% endif %}
-  </section>
-  {% endif %}
-
+{result_section}
   <section class="panel">
     <h2>Catatan penting</h2>
     <div class="warning">
@@ -130,39 +158,226 @@ HTML = """
     </div>
   </section>
 </main>
-<footer>Demo pembelajaran • Data gejala merujuk artikel “Sistem Pakar Untuk Mendiagnosa Penyakit Pertussis (Batuk Rejan)” (2020).</footer>
-</body>
-</html>
-"""
+<footer>Demo pembelajaran • Data gejala merujuk artikel “Sistem Pakar Untuk Mendiagnosa Penyakit Pertussis (Batuk Rejan)” (2020).</footer>"""
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    submitted = request.method == "POST"
-    selected = request.form.getlist("gejala") if submitted else []
-    selected = [code for code in selected if code in GEJALA]
 
+def calculate_results(selected):
     results = []
     if selected:
         for code, data in PENYAKIT.items():
             disease_symptoms = data["gejala"]
             score = cosine_similarity(selected, disease_symptoms)
             overlap = sum(1 for symptom in selected if symptom in disease_symptoms)
-            results.append({
-                "kode": code,
-                "nama": data["nama"],
-                "score": score,
-                "overlap": overlap,
-                "total": len(disease_symptoms),
-            })
+            results.append(
+                {
+                    "kode": code,
+                    "nama": data["nama"],
+                    "score": score,
+                    "overlap": overlap,
+                    "total": len(disease_symptoms),
+                }
+            )
         results.sort(key=lambda item: item["score"], reverse=True)
+    return results
 
-    return render_template_string(
-        HTML,
-        symptoms=GEJALA,
-        selected=selected,
-        submitted=submitted,
-        results=results,
-    )
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# ---------------------------------------------------------------------------
+# Komponen Streamlit kustom
+#
+# HTML/CSS asli tetap dipakai apa adanya. Komponen ini hanya "jembatan" agar
+# checkbox dan tombol HTML asli dapat mengirim nilainya kembali ke Python.
+# ---------------------------------------------------------------------------
+COMPONENT_SHELL = """<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin:0; padding:0; width:100%; background:transparent; }
+  #root { width:100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function () {
+  var RENDER = "streamlit:render";
+  var READY = "streamlit:componentReady";
+  var SET_VALUE = "streamlit:setComponentValue";
+  var SET_HEIGHT = "streamlit:setFrameHeight";
+  var lastHtml = null;
+  var lastHeight = -1;
+
+  function send(type, data) {
+    var message = { isStreamlitMessage: true, type: type };
+    if (data) {
+      for (var key in data) {
+        if (Object.prototype.hasOwnProperty.call(data, key)) {
+          message[key] = data[key];
+        }
+      }
+    }
+    window.parent.postMessage(message, "*");
+  }
+
+  function setHeight() {
+    var doc = document.documentElement;
+    var height = Math.ceil(Math.max(
+      document.body.scrollHeight,
+      document.body.offsetHeight,
+      doc.scrollHeight,
+      doc.offsetHeight
+    ));
+    if (height < 1) {
+      return;
+    }
+    if (height !== lastHeight) {
+      lastHeight = height;
+      send(SET_HEIGHT, { height: height });
+    }
+  }
+
+  function bindForm() {
+    var form = document.querySelector("form");
+    if (!form || form.dataset.pertussisBound === "1") {
+      return;
+    }
+    form.dataset.pertussisBound = "1";
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var checked = Array.prototype.slice
+        .call(document.querySelectorAll('input[name="gejala"]:checked'))
+        .map(function (input) { return input.value; });
+      send(SET_VALUE, {
+        dataType: "json",
+        value: {
+          gejala: checked,
+          submitted: true,
+          nonce: String(Date.now()) + "-" + Math.random().toString(36).slice(2)
+        }
+      });
+      setTimeout(setHeight, 0);
+    });
+  }
+
+  function render(event) {
+    var data = event.data;
+    if (!data || data.type !== RENDER) {
+      return;
+    }
+    var args = data.args || {};
+    if (typeof args.html === "string" && args.html !== lastHtml) {
+      lastHtml = args.html;
+      document.getElementById("root").innerHTML = args.html;
+      bindForm();
+    }
+    requestAnimationFrame(setHeight);
+    setTimeout(setHeight, 50);
+    setTimeout(setHeight, 250);
+  }
+
+  window.addEventListener("message", render);
+  window.addEventListener("resize", setHeight);
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(setHeight).observe(document.getElementById("root"));
+  }
+
+  send(READY, { apiVersion: 1 });
+  setTimeout(function () {
+    send(READY, { apiVersion: 1 });
+  }, 300);
+})();
+</script>
+</body>
+</html>
+"""
+
+
+def _get_component():
+    component_dir = Path(tempfile.gettempdir()) / "pertussis_streamlit_component"
+    component_dir.mkdir(parents=True, exist_ok=True)
+    (component_dir / "index.html").write_text(COMPONENT_SHELL, encoding="utf-8")
+    return components.declare_component("pertussis_component", path=str(component_dir))
+
+
+# ---------------------------------------------------------------------------
+# Aplikasi Streamlit
+# ---------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Sistem Informasi Gejala Pertussis",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+pertussis_component = _get_component()
+
+# Menyembunyikan chrome Streamlit dan padding bawaan agar halaman asli tampil
+# penuh. CSS desain asli di dalam komponen tidak diubah.
+st.markdown(
+    """
+<style>
+  header[data-testid="stHeader"],
+  [data-testid="stToolbar"],
+  [data-testid="stDecoration"],
+  [data-testid="stStatusWidget"],
+  [data-testid="stAppDeployButton"],
+  #MainMenu,
+  footer {
+    display: none !important;
+  }
+  .stApp,
+  [data-testid="stAppViewContainer"],
+  [data-testid="stMain"] {
+    background: #f4f7fa !important;
+  }
+  .block-container,
+  [data-testid="stMainBlockContainer"],
+  [data-testid="stBottomBlockContainer"] {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  [data-testid="stVerticalBlock"] {
+    gap: 0 !important;
+  }
+  [data-testid="stCustomComponentV1"] {
+    width: 100% !important;
+  }
+  [data-testid="stCustomComponentV1"] iframe {
+    display: block !important;
+    width: 100% !important;
+  }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+if "pertussis_form" not in st.session_state:
+    st.session_state.pertussis_form = {
+        "gejala": [],
+        "submitted": False,
+        "nonce": None,
+    }
+
+form_state = st.session_state.pertussis_form
+selected = form_state["gejala"]
+submitted = form_state["submitted"]
+results = calculate_results(selected)
+
+component_value = pertussis_component(
+    html=render_page(selected, submitted, results),
+    height=1200,
+    key="pertussis_html_form",
+)
+
+if isinstance(component_value, dict):
+    value_nonce = component_value.get("nonce")
+    if value_nonce is not None and value_nonce != form_state["nonce"]:
+        selected = [
+            code for code in component_value.get("gejala", []) if code in GEJALA
+        ]
+        st.session_state.pertussis_form = {
+            "gejala": selected,
+            "submitted": True,
+            "nonce": value_nonce,
+        }
+        st.rerun()
