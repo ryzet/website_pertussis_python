@@ -4,9 +4,6 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ---------------------------------------------------------------------------
-# Data (tidak diubah dari versi Flask)
-# ---------------------------------------------------------------------------
 GEJALA = {
     "G1": "Hidung meler",
     "G2": "Bersin-bersin",
@@ -49,10 +46,6 @@ def cosine_similarity(selected, disease_symptoms):
 
     return dot_product / (selected_norm * disease_norm)
 
-
-# ---------------------------------------------------------------------------
-# CSS asli dari versi Flask (tidak diubah sama sekali)
-# ---------------------------------------------------------------------------
 STYLE = """
     :root { --navy:#17324d; --blue:#246b8e; --pale:#eef6f8; --ink:#263746; --muted:#617383; }
     * { box-sizing: border-box; }
@@ -180,13 +173,6 @@ def calculate_results(selected):
         results.sort(key=lambda item: item["score"], reverse=True)
     return results
 
-
-# ---------------------------------------------------------------------------
-# Komponen Streamlit kustom
-#
-# HTML/CSS asli tetap dipakai apa adanya. Komponen ini hanya "jembatan" agar
-# checkbox dan tombol HTML asli dapat mengirim nilainya kembali ke Python.
-# ---------------------------------------------------------------------------
 COMPONENT_SHELL = """<!doctype html>
 <html lang="id">
 <head>
@@ -299,10 +285,6 @@ def _get_component():
     (component_dir / "index.html").write_text(COMPONENT_SHELL, encoding="utf-8")
     return components.declare_component("pertussis_component", path=str(component_dir))
 
-
-# ---------------------------------------------------------------------------
-# Aplikasi Streamlit
-# ---------------------------------------------------------------------------
 st.set_page_config(
     page_title="Sistem Informasi Gejala Pertussis",
     layout="wide",
@@ -311,8 +293,6 @@ st.set_page_config(
 
 pertussis_component = _get_component()
 
-# Menyembunyikan chrome Streamlit dan padding bawaan agar halaman asli tampil
-# penuh. CSS desain asli di dalam komponen tidak diubah.
 st.markdown(
     """
 <style>
